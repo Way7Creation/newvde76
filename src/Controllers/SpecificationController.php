@@ -3,7 +3,7 @@ namespace App\Controllers;
 
 use App\Core\Layout;
 use App\Core\CSRF;
-use App\Core\Cart;
+use App\Services\CartService;
 use App\Core\Database;
 use App\Services\AuthService;
 
@@ -29,7 +29,8 @@ class SpecificationController
             }
 
             // 2. Получаем корзину
-            $cart = Cart::get();
+            $userId = AuthService::check() ? (int)AuthService::user()['id'] : null;
+            $cart = CartService::get($userId);
             if (!$cart || !is_array($cart) || count($cart) === 0) {
                 echo json_encode(['success' => false, 'message' => 'Корзина пуста']);
                 return;
@@ -64,9 +65,7 @@ class SpecificationController
             // 4. Сохраняем спецификацию
             if (AuthService::check()) {
                 $pdo = Database::getConnection();
-                $userId = AuthService::check() ? (int)AuthService::user()['id'] : 0;
-                $cart = \App\Services\CartService::load($userId);
-                \App\Services\CartService::clear($userId);
+                $userId = (int)AuthService::user()['id'];
 
                 // Создаём заголовок спецификации
                 $stmt = $pdo->prepare("INSERT INTO specifications (user_id, created_at) VALUES (?, NOW())");
@@ -87,7 +86,7 @@ class SpecificationController
                 $stmt = $pdo->prepare($sql);
                 $stmt->execute($values);
 
-                Cart::save([]); // очищаем корзину
+                CartService::clear($userId); // очищаем корзину
                 echo json_encode(['success' => true, 'specification_id' => $specId]);
                 return;
             } else {
@@ -98,7 +97,7 @@ class SpecificationController
                     'created_at' => date('Y-m-d H:i:s'),
                     'items' => $items
                 ];
-                Cart::save([]); // очищаем корзину
+                CartService::clear(); // очищаем корзину
                 echo json_encode(['success' => true, 'specification_id' => $specId, 'guest' => true]);
                 return;
             }
