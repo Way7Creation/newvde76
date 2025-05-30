@@ -1,7 +1,6 @@
 <?php
 namespace App\Controllers;
 
-use App\Core\Cart;
 use App\Services\CartService;
 use App\Services\AuthService;
 use App\Core\CSRF;
@@ -23,23 +22,15 @@ class CartController
             return json_encode(['success' => false, 'message' => 'Некорректные данные']);
         }
 
-        if (AuthService::check()) {
-            $userId = AuthService::user()['id'];
-            $cart = CartService::load($userId);
-            if (!isset($cart[$productId])) {
-                $cart[$productId] = ['product_id' => $productId, 'quantity' => 0];
-            }
-            $cart[$productId]['quantity'] += $quantity;
-            CartService::saveToDatabase($userId, $cart);
-        } else {
-            $cart = Cart::get();
-            if (!isset($cart[$productId])) {
-                $cart[$productId] = ['product_id' => $productId, 'quantity' => 0];
-            }
-            $cart[$productId]['quantity'] += $quantity;
-            Cart::save($cart);
+        $userId = AuthService::check() ? AuthService::user()['id'] : null;
+
+        try {
+            CartService::add($productId, $quantity, $userId);
+            return json_encode(['success' => true, 'message' => 'Товар добавлен в корзину']);
+        } catch (\Exception $e) {
+            http_response_code(400);
+            return json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
-        return json_encode(['success' => true, 'message' => 'Товар добавлен в корзину']);
     }
 
     /**
@@ -47,14 +38,11 @@ class CartController
      */
     public function viewAction(): void
     {
-        if (AuthService::check()) {
-            $userId = AuthService::user()['id'];
-            $cart = CartService::load($userId);
-        } else {
-            $cart = Cart::get();
-        }
+        $userId = AuthService::check() ? AuthService::user()['id'] : null;
+        $cart = CartService::get($userId);
         $productIds = array_keys($cart);
         $products = [];
+
         if (!empty($productIds)) {
             $client = \OpenSearch\ClientBuilder::create()->build();
             $body = [
@@ -66,6 +54,7 @@ class CartController
                 $products[$hit['_id']] = $hit['_source'];
             }
         }
+
         $rows = [];
         foreach ($cart as $pid => $item) {
             $rows[] = [
@@ -75,6 +64,7 @@ class CartController
                 'base_price' => $products[$pid]['base_price'] ?? 0,
             ];
         }
+
         Layout::render('cart/view', [
             'cartRows' => $rows,
             'cart' => $cart,
@@ -92,21 +82,16 @@ class CartController
             http_response_code(403);
             return json_encode(['success' => false, 'message' => 'Недоступно']);
         }
+
         $productId = (int)($_POST['productId'] ?? 0);
         if ($productId <= 0) {
             http_response_code(400);
             return json_encode(['success' => false, 'message' => 'Некорректные данные']);
         }
-        if (AuthService::check()) {
-            $userId = AuthService::user()['id'];
-            $cart = CartService::load($userId);
-            unset($cart[$productId]);
-            CartService::saveToDatabase($userId, $cart);
-        } else {
-            $cart = Cart::get();
-            unset($cart[$productId]);
-            Cart::save($cart);
-        }
+
+        $userId = AuthService::check() ? AuthService::user()['id'] : null;
+        CartService::remove($productId, $userId);
+
         return json_encode(['success' => true, 'message' => 'Товар удален из корзины']);
     }
 
@@ -120,12 +105,10 @@ class CartController
             http_response_code(403);
             return json_encode(['success' => false, 'message' => 'Недоступно']);
         }
-        if (AuthService::check()) {
-            $userId = AuthService::user()['id'];
-            CartService::clear($userId);
-        } else {
-            Cart::clear();
-        }
+
+        $userId = AuthService::check() ? AuthService::user()['id'] : null;
+        CartService::clear($userId);
+
         return json_encode(['success' => true, 'message' => 'Корзина очищена']);
     }
 
@@ -135,12 +118,8 @@ class CartController
     public function getJsonAction(): string
     {
         header('Content-Type: application/json; charset=utf-8');
-        if (AuthService::check()) {
-            $userId = AuthService::user()['id'];
-            $cart = CartService::load($userId);
-        } else {
-            $cart = Cart::get();
-        }
+        $userId = AuthService::check() ? AuthService::user()['id'] : null;
+        $cart = CartService::get($userId);
         return json_encode(['cart' => $cart]);
     }
 }
