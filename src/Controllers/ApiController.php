@@ -4,6 +4,7 @@ namespace App\Controllers;
 use App\Core\Database;
 use App\Services\SearchService;
 use App\Services\DynamicProductDataService;
+use App\DTO\ProductAvailabilityDTO;
 use App\Services\AuthService;
 use App\Core\Logger;
 

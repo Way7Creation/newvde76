@@ -15,6 +15,9 @@ try {
     // 1. Config первым
     Config::get('app.name');
     
+    // 1.1. Кэш
+    \App\Core\Cache::init();
+    
     // 2. SecurityManager без логирования
     SecurityManager::initialize();
     

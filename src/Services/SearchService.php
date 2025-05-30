@@ -340,14 +340,20 @@ class SearchService
      */
     private static function enrichWithBasicData(array $products): array
     {
-        // Пока просто возвращаем как есть
-        // Позже можно добавить цены и остатки
+        if (empty($products)) return $products;
+        
+        $productIds = array_column($products, 'product_id');
+        $cityId = $_GET['city_id'] ?? 1;
+        $userId = AuthService::check() ? AuthService::user()['id'] : null;
+        
+        $dynamicService = new DynamicProductDataService();
+        $dynamicData = $dynamicService->getProductsDynamicData($productIds, $cityId, $userId);
+        
         foreach ($products as &$product) {
-            // Добавляем базовые поля если их нет
-            $product['price'] = ['final' => 0, 'base' => 0, 'has_special' => false];
-            $product['stock'] = ['quantity' => 0, 'warehouses' => []];
-            $product['delivery'] = ['text' => 'Уточняйте', 'date' => null];
-            $product['available'] = false;
+            $pid = $product['product_id'];
+            if (isset($dynamicData[$pid])) {
+                $product = array_merge($product, $dynamicData[$pid]);
+            }
         }
         
         return $products;

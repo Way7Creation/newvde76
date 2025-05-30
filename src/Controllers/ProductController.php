@@ -126,74 +126,7 @@ class ProductController
      */
     public function ajaxProductsAction(): void
     {
-        header('Content-Type: application/json; charset=utf-8');
-        
-        $client = \OpenSearch\ClientBuilder::create()->build();
-        
-        $page = (int)($_GET['page'] ?? 1);
-        $perPage = (int)($_GET['itemsPerPage'] ?? 20);
-        $from = ($page - 1) * $perPage;
-        
-        $query = ['bool' => ['must' => []]];
-        
-        // Поиск
-        if (!empty($_GET['search'])) {
-            $query['bool']['must'][] = [
-                'multi_match' => [
-                    'query' => $_GET['search'],
-                    'fields' => ['name^3', 'sku^2', 'external_id', 'brand_name', 'series_name'],
-                    'type' => 'best_fields',
-                    'operator' => 'or'
-                ]
-            ];
-        }
-        
-        // Фильтры
-        if (!empty($_GET['brand_name'])) {
-            $query['bool']['must'][] = ['term' => ['brand_name' => $_GET['brand_name']]];
-        }
-        
-        if (!empty($_GET['category'])) {
-            $query['bool']['must'][] = ['term' => ['categories' => $_GET['category']]];
-        }
-        
-        // Если нет условий, используем match_all
-        if (empty($query['bool']['must'])) {
-            $query = ['match_all' => (object)[]];
-        }
-        
-        // Сортировка
-        $sortField = $_GET['sortColumn'] ?? 'name';
-        $sortDir = $_GET['sortDirection'] ?? 'asc';
-        
-        $params = [
-            'index' => 'products_current',
-            'body' => [
-                'from' => $from,
-                'size' => $perPage,
-                'query' => $query,
-                'sort' => [[$sortField . '.keyword' => ['order' => $sortDir]]]
-            ]
-        ];
-        
-        try {
-            $response = $client->search($params);
-            
-            $products = [];
-            foreach ($response['hits']['hits'] as $hit) {
-                $products[] = $hit['_source'];
-            }
-            
-            echo json_encode([
-                'products' => $products,
-                'totalProducts' => $response['hits']['total']['value'] ?? 0,
-                'page' => $page,
-                'itemsPerPage' => $perPage
-            ]);
-        } catch (\Exception $e) {
-            http_response_code(500);
-            echo json_encode(['error' => 'Ошибка поиска']);
-        }
+        $this->jsonResponse(SearchService::search($_GET));
     }
     
     public function searchAction(): void
