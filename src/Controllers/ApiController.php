@@ -16,7 +16,10 @@ class ApiController extends BaseController
     public function availabilityAction(): void
     {
         try {
-            $validated = $this->validate($this->getInput(), [
+            // Получаем параметры из GET-запроса
+            $input = array_merge($_GET, $this->getInput());
+            
+            $validated = $this->validate($input, [
                 'city_id' => 'required|integer|min:1',
                 'product_ids' => 'required|string|max:10000'
             ]);
