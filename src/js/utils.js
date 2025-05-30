@@ -19,29 +19,24 @@ export async function fetchProducts() {
     showLoadingIndicator();
     
     try {
+        // Собираем параметры для поиска
         const params = {
             q: window.appliedFilters.search || '',
             page: window.currentPage || 1,
             limit: window.itemsPerPage || 20,
-            sort: window.sortColumn || 'name',
+            sort: convertSortToApiFormat(window.sortColumn, window.sortDirection),
             city_id: document.getElementById('citySelect')?.value || '1'
         };
         
-        // Добавляем фильтры как отдельные параметры
+        // Добавляем остальные фильтры
         Object.entries(window.appliedFilters).forEach(([key, value]) => {
             if (key !== 'search' && value) {
                 params[key] = value;
             }
         });
         
-        const queryString = new URLSearchParams(params).toString();
-        const response = await fetch(`/api/search?${queryString}`);
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-        }
-        
-        const result = await response.json();
+        // Используем productService для поиска
+        const result = await productService.search(params);
         
         if (result.success) {
             window.productsData = result.data.products;
@@ -49,6 +44,7 @@ export async function fetchProducts() {
             window.renderProductsTable();
             updatePaginationInfo();
             
+            // Загружаем данные о наличии для отображенных товаров
             if (window.productsData.length > 0) {
                 const ids = window.productsData.map(p => p.product_id);
                 window.loadAvailability(ids);
@@ -67,16 +63,21 @@ export async function fetchProducts() {
     }
 }
 
-function getSortParam() {
-    const column = window.sortColumn || 'name';
-    const direction = window.sortDirection || 'asc';
-    
-    // Преобразуем в формат API
-    if (column === 'base_price') {
+// Преобразование формата сортировки для API
+function convertSortToApiFormat(column, direction) {
+    // Специальные случаи для сортировки по цене
+    if (column === 'base_price' || column === 'price') {
         return direction === 'asc' ? 'price_asc' : 'price_desc';
     }
     
-    return column === 'name' ? 'name' : 'relevance';
+    // Для остальных колонок возвращаем как есть
+    const sortableColumns = ['name', 'external_id', 'sku', 'availability', 'popularity'];
+    if (sortableColumns.includes(column)) {
+        return column;
+    }
+    
+    // По умолчанию - релевантность
+    return 'relevance';
 }
 
 function updatePaginationInfo() {
@@ -84,15 +85,24 @@ function updatePaginationInfo() {
     
     // Обновляем все элементы пагинации
     document.querySelectorAll('#currentPage, #currentPageBottom').forEach(el => {
-        el.textContent = window.currentPage;
+        if (el) el.textContent = window.currentPage;
     });
     
     document.querySelectorAll('#totalPages, #totalPagesBottom').forEach(el => {
-        el.textContent = totalPages;
+        if (el) el.textContent = totalPages;
     });
     
     document.querySelectorAll('#totalProductsText, #totalProductsTextBottom').forEach(el => {
-        el.textContent = `Найдено товаров: ${window.totalProducts}`;
+        if (el) el.textContent = `Найдено товаров: ${window.totalProducts}`;
+    });
+    
+    // Управление состоянием кнопок пагинации
+    document.querySelectorAll('.prev-btn').forEach(btn => {
+        if (btn) btn.disabled = window.currentPage <= 1;
+    });
+    
+    document.querySelectorAll('.next-btn').forEach(btn => {
+        if (btn) btn.disabled = window.currentPage >= totalPages;
     });
 }
 
@@ -105,6 +115,19 @@ export function showLoadingIndicator() {
     indicator.innerHTML = `
         <div class="spinner-border spinner-border-sm"></div>
         <span>Загрузка...</span>
+    `;
+    indicator.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        z-index: 9999;
     `;
     document.body.appendChild(indicator);
 }
