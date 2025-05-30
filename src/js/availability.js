@@ -62,33 +62,32 @@ class AvailabilityService {
      */
     async fetchBatch(productIds, cityId) {
         try {
+            // Создаем параметры URL
             const params = new URLSearchParams({
                 city_id: cityId,
                 product_ids: productIds.join(',')
             });
-
-            const response = await fetch(this.apiUrl, {
-                method: 'GET',  // ✅ Правильный метод
+            
+            // Формируем URL с параметрами
+            const url = `${this.apiUrl}?${params.toString()}`;
+    
+            // Правильный GET-запрос без тела
+            const response = await fetch(url, {
+                method: 'GET',
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
                 },
-                credentials: 'same-origin',
-                body: JSON.stringify({  // ✅ Отправляем данные в теле запроса
-                    city_id: cityId,
-                    product_ids: productIds
-                })
+                credentials: 'same-origin'
             });
-
+    
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
-
+    
             const result = await response.json();
             
             if (result.success && result.data) {
-                // Кешируем результаты
                 this.saveToCache(result.data, cityId);
                 return result.data;
             }
