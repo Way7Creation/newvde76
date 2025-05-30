@@ -3,6 +3,8 @@ namespace App\Services;
 
 use App\Core\Database;
 use App\Core\Cache;
+use App\Core\Logger;
+use PDO;
 
 /**
  * Сервис для работы с динамическими данными товаров
